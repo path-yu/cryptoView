@@ -36,8 +36,8 @@ dependencies:
     specifier: ^11.12.0
     version: 11.12.0(react-dom@18.3.1)(react@18.3.1)
   klinecharts:
-    specifier: ^9.8.10
-    version: 9.8.10
+    specifier: 10.0.0-alpha1
+    version: 10.0.0-alpha1
   next:
     specifier: 15.0.3
     version: 15.0.3(react-dom@18.3.1)(react@18.3.1)
@@ -5068,8 +5068,8 @@ packages:
       json-buffer: 3.0.1
     dev: true
 
-  /klinecharts@9.8.10:
-    resolution: {integrity: sha512-4h0u749uprwaw8CifpegpjHzHnw/I9VTYb2wkUtBQqWnUPvxS4IpkkyMAwPcYbuzXWoqfqFGO02sRd3QDW4sbQ==}
+  /klinecharts@10.0.0-alpha1:
+    resolution: {integrity: sha512-eE56BCuiZT5ookumWiYvoCrTooWbjnPd0FhGi0PyaIWjAR+sT6bDrC50XVoT7ztOZ80ZUeieEh3yW2kRSRgeGA==}
     engines: {node: '>=0.10.0'}
     dev: false
 

@@ -93,3 +93,152 @@ export function determineTrend(
     return "neutral";
   }
 }
+// 格式化k线数据
+export function formatCandleData(data: []): CandleData[] {
+  if (!data) return [];
+  return data.map((candle) => ({
+    timestamp: parseInt(candle[0]),
+    open: candle[1],
+    high: candle[2],
+    low: candle[3],
+    close: candle[4],
+    vol: candle[5],
+  }));
+}
+
+// 计算简单移动平均线（SMA）
+function calculateSMA(data: CandleData[], period: number): number[] {
+  const sma: number[] = [];
+  for (let i = period - 1; i < data.length; i++) {
+    const sum = data
+      .slice(i - period + 1, i + 1)
+      .reduce((acc, val) => acc + val.close, 0);
+    sma.push(sum / period);
+  }
+  return sma;
+}
+
+// 计算布林带（Bollinger Bands）
+interface BollingerBands {
+  upper: number[];
+  lower: number[];
+}
+
+function calculateBollingerBands(
+  data: CandleData[],
+  period: number,
+  stdDevMultiplier: number
+): BollingerBands {
+  const sma = calculateSMA(data, period);
+  const bands: BollingerBands = { upper: [], lower: [] };
+  for (let i = period - 1; i < data.length; i++) {
+    const slice = data.slice(i - period + 1, i + 1);
+    const mean = sma[i - period + 1];
+    const stdDev = Math.sqrt(
+      slice.reduce((acc, val) => acc + Math.pow(val.close - mean, 2), 0) /
+        period
+    );
+    bands.upper.push(mean + stdDevMultiplier * stdDev);
+    bands.lower.push(mean - stdDevMultiplier * stdDev);
+  }
+  return bands;
+}
+
+// 计算支撑位和压力位（Pivot Points）
+interface PivotPoints {
+  pivot: number;
+  resistance1: number;
+  support1: number;
+  resistance2: number;
+  support2: number;
+}
+
+function calculatePivotPoints(
+  high: number,
+  low: number,
+  close: number
+): PivotPoints {
+  const pivot = (high + low + close) / 3;
+  const resistance1 = 2 * pivot - low;
+  const support1 = 2 * pivot - high;
+  const resistance2 = pivot + (high - low);
+  const support2 = pivot - (high - low);
+
+  return { pivot, resistance1, support1, resistance2, support2 };
+}
+
+// 计算费波纳奇回调水平（Fibonacci Retracement）
+interface FibonacciLevels {
+  [key: string]: number;
+}
+
+function calculateFibonacciRetracement(
+  high: number,
+  low: number
+): FibonacciLevels {
+  const diff = high - low;
+  return {
+    "0%": high,
+    "23.6%": high - 0.236 * diff,
+    "38.2%": high - 0.382 * diff,
+    "50%": high - 0.5 * diff,
+    "61.8%": high - 0.618 * diff,
+    "100%": low,
+  };
+}
+
+// 综合计算压力位和支撑位
+export interface SupportResistanceLevels {
+  pivotPoints: PivotPoints;
+  fibonacciLevels: FibonacciLevels;
+  bollingerBands: BollingerBands;
+}
+
+export function calculateSupportResistance(
+  data: CandleData[]
+): SupportResistanceLevels {
+  const recentHigh = Math.max(...data.map((c) => +c.high));
+  const recentLow = Math.min(...data.map((c) => +c.low));
+  const recentClose = +data[data.length - 1].close;
+
+  const pivotPoints = calculatePivotPoints(recentHigh, recentLow, recentClose);
+  const fibonacciLevels = calculateFibonacciRetracement(recentHigh, recentLow);
+  const bollingerBands = calculateBollingerBands(data, 20, 2); // 以20日移动平均线和2倍标准差为例
+
+  return {
+    pivotPoints,
+    fibonacciLevels,
+    bollingerBands,
+  };
+}
+// 生成交易建议
+export function generateTradeRecommendations(
+  data: CandleData[],
+  levels: SupportResistanceLevels
+): { entryPoints: string[]; exitPoints: string[] } {
+  const lastPrice = data[data.length - 1].close;
+  const entryPoints: string[] = [];
+  const exitPoints: string[] = [];
+
+  // 入场建议
+  if (
+    lastPrice <= levels.pivotPoints.support1 ||
+    lastPrice <= levels.fibonacciLevels["61.8%"] ||
+    lastPrice <=
+      levels.bollingerBands.lower[levels.bollingerBands.lower.length - 1]
+  ) {
+    entryPoints.push("当前价格接近支撑位或布林带下轨，可以考虑入场做多。");
+  }
+
+  // 离场建议
+  if (
+    lastPrice >= levels.pivotPoints.resistance1 ||
+    lastPrice >= levels.fibonacciLevels["23.6%"] ||
+    lastPrice >=
+      levels.bollingerBands.upper[levels.bollingerBands.upper.length - 1]
+  ) {
+    exitPoints.push("当前价格接近压力位或布林带上轨，可以考虑离场。");
+  }
+
+  return { entryPoints, exitPoints };
+}
