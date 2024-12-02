@@ -1,10 +1,9 @@
 "use client";
 
-import { useState, useEffect, useCallback, ChangeEvent, Key } from "react";
+import { useState, useEffect, Key } from "react";
 
-import { Select, SelectSection, SelectItem } from "@nextui-org/select";
-import { Card, CardHeader, CardBody, CardFooter } from "@nextui-org/card";
-import { CurrencyPair, CandleData, TrendAnalysis } from "@/types";
+import { Card, CardHeader, CardBody } from "@nextui-org/card";
+import { CurrencyPair, CandleData } from "@/types";
 import { createWebSocket } from "@/okx-websocket";
 import { Autocomplete, AutocompleteItem } from "@nextui-org/autocomplete";
 import { OKX_DOMAIN } from "@/key";
@@ -18,7 +17,7 @@ let chartEle: Nullable<Chart>;
 let ws: WebSocket;
 const timeList = ["1m", "3m", "5m", "15m", "1H", "2H", "4H", "1D", "1W", "1M"];
 //回调函数
-let callback: Function;
+let callback: () => void;
 export default function CurrencyAnalysis() {
   const [currencyPairs, setCurrPairs] = useState<CurrencyPair[]>([]);
   const [selectedPair, setSelectedPair] = useState<string>("BTC-USDT-SWAP");
@@ -37,8 +36,8 @@ export default function CurrencyAnalysis() {
   // 数据加载loading
   const [loading, setLoading] = useState(true);
   async function fetchData(currentPair?: string, time?: string) {
-    let resPair = currentPair ? currentPair : selectedPair;
-    let resTime = time ? time : selectedTimeFrame;
+    const resPair = currentPair ? currentPair : selectedPair;
+    const resTime = time ? time : selectedTimeFrame;
     // 关闭旧连接
     if (ws) {
       ws.close();
@@ -50,22 +49,24 @@ export default function CurrencyAnalysis() {
     }
 
     // 获取k线数据
-    let res = await fetch(
+    const res = await fetch(
       `https://www.okx.com/api/v5/market/candles?instId=${resPair}&bar=${resTime}&limit=303&t=${new Date().getTime()}`
     );
     let curParsId;
     if (!currencyPairs.length) {
       //获取所有合约产品
-      let products = await fetch(
+      const products = await fetch(
         `${OKX_DOMAIN + "/api/v5/public/instruments?instType=SWAP"}`
       );
-      let productsData = await products.json();
-      let paris = productsData.data.map((item: any) => {
-        return {
-          instId: item.instId,
-          name: item.instId,
-        };
-      });
+      const productsData = await products.json();
+      const paris = productsData.data.map(
+        (item: { instId: string; name: string }) => {
+          return {
+            instId: item.instId,
+            name: item.instId,
+          };
+        }
+      );
       setCurrPairs(paris);
       setSelectedPair(paris[0].instId);
       curParsId = paris[0].instId;
@@ -73,8 +74,8 @@ export default function CurrencyAnalysis() {
       curParsId = resPair;
     }
 
-    let data = await res.json();
-    let candles = data.data.map((candle: any) => {
+    const data = await res.json();
+    const candles = data.data.map((candle: never) => {
       return {
         timestamp: parseInt(candle[0]),
         open: candle[1],
@@ -102,7 +103,7 @@ export default function CurrencyAnalysis() {
   }
   // 计算当前价格趋势
   const calculateTrend = () => {
-    let data = chartEle?.getDataList() as CandleData[];
+    const data = chartEle?.getDataList() as CandleData[];
     const ema12 = calculateEMA(data, 12); // 计算12日EMA
     const ema26 = calculateEMA(data, 26); // 计算26日EMA
     const rsi14 = calculateRSI(data, 14); // 计算14日RSI
@@ -114,7 +115,7 @@ export default function CurrencyAnalysis() {
   useEffect(() => {
     chartEle = init("chart");
     // 设置价格精度
-    chartEle!.setLoadDataCallback(({ type, data, callback }) => {
+    chartEle!.setLoadDataCallback(({ type }) => {
       if (type === "forward") {
       } else {
       }
@@ -126,6 +127,7 @@ export default function CurrencyAnalysis() {
         ws.close();
       }
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   // 编写一个设置价格精度函数
   const setPricePrecision = (price?: string) => {
