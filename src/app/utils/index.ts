@@ -95,17 +95,20 @@ export function determineTrend(
 }
 // 格式化k线数据
 export function formatCandleData(data: []): CandleData[] {
-  if (!data) return [];
   return data.map((candle) => ({
     timestamp: parseInt(candle[0]),
-    open: candle[1],
-    high: candle[2],
-    low: candle[3],
-    close: candle[4],
-    vol: candle[5],
+    open: +candle[1],
+    high: +candle[2],
+    low: +candle[3],
+    close: +candle[4],
+    volume: +candle[5],
+    // 成交额
+    turnover: parseFloat(candle[7]),
   }));
 }
-
+export function isValid<T>(value: T | null | undefined): value is T {
+  return value !== null && value !== undefined;
+}
 // 计算简单移动平均线（SMA）
 function calculateSMA(data: CandleData[], period: number): number[] {
   const sma: number[] = [];

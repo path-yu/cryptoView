@@ -15,8 +15,7 @@ export async function createWebSocket(
         op: "subscribe",
         args: [
           {
-            channel: `mark-price-candle${time}`,
-            instType: "SWAP",
+            channel: `candle${time}`,
             instId: instId,
           },
         ],
@@ -46,14 +45,16 @@ export async function createWebSocket(
       0：K线未完结
       1：K线已完结
        */
-      const [timestamp, open, high, low, close, vol] = data.data[0];
+      const [timestamp, open, high, low, close, vol, , turnover] = data.data[0];
       onMessage({
         timestamp: parseInt(timestamp),
-        open: open,
-        high: high,
-        low: low,
-        close: close,
-        vol: vol,
+        open: +open,
+        high: +high,
+        low: +low,
+        close: +close,
+        volume: +vol,
+        // 成交额
+        turnover: +turnover,
       });
     }
   };

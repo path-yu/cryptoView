@@ -9,7 +9,8 @@ export type CandleData = {
   high: number;
   low: number;
   close: number;
-  vol: number;
+  volume?: number;
+  turnover?: number;
 };
 
 export type TrendAnalysis = "bullish" | "bearish" | "neutral" | "null";

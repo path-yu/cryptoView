@@ -20,6 +20,8 @@ import {
   SupportResistanceLevels,
 } from "./utils";
 import { useRef } from "react";
+import { getPrecision, toDecimalString } from "./utils/math";
+
 registerLocale("zh-CN", {
   time: "时间：",
   open: "开盘：",
@@ -30,6 +32,7 @@ registerLocale("zh-CN", {
   turnover: "成交额：",
   change: "涨幅：",
 });
+
 let chartEle: Nullable<Chart>;
 let ws: WebSocket;
 const timeList = ["1m", "3m", "5m", "15m", "1H", "2H", "4H", "1D", "1W", "1M"];
@@ -92,9 +95,10 @@ export default function CurrencyAnalysis() {
           };
         }
       );
+
       setCurrPairs(paris);
-      setSelectedPair(paris[0].instId);
-      curParsId = paris[0].instId;
+      setSelectedPair("BTC-USDT-SWAP");
+      curParsId = "BTC-USDT-SWAP";
     } else {
       curParsId = resPair;
     }
@@ -104,17 +108,20 @@ export default function CurrencyAnalysis() {
     const moreData = await fetchMoreData(candles);
     const result = [...moreData, ...candles.reverse()];
     chartEle!.applyNewData(result);
+    if (chartEle?.getIndicators().size === 0) {
+      chartEle?.createIndicator("VOL");
+      chartEle?.createIndicator("EMA");
+      chartEle?.createIndicator("RSI");
+    }
     // 计算当前走势的压力位和支撑位
     const levels = calculateSupportResistance(result);
     setLevels(levels);
-    console.log(generateTradeRecommendations(result, levels));
-
     setAdvice(generateTradeRecommendations(result, levels));
-    listData.current = candles;
+    listData.current = result;
     if (callback) {
       callback();
     } else {
-      setPricePrecision(candles[0].close + "");
+      setPricePrecision(candles[0].close);
     }
     calculateTrend();
     setLoading(false);
@@ -145,7 +152,7 @@ export default function CurrencyAnalysis() {
 
     // 第一次获取的数据直接返回，不合并
     if (iteration === 3) {
-      return fetchMoreData(candles, iteration - 1);
+      return fetchMoreData(candles.reverse(), iteration - 1);
     }
 
     // 之后的每次获取都将新数据插入到前面
@@ -158,33 +165,24 @@ export default function CurrencyAnalysis() {
     const ema12 = calculateEMA(data, 12); // 计算12日EMA
     const ema26 = calculateEMA(data, 26); // 计算26日EMA
     const rsi14 = calculateRSI(data, 14); // 计算14日RSI
-
     const marketTrend = determineTrend(ema12, ema26, rsi14, data);
-
     setTrend(marketTrend);
   };
   useEffect(() => {
     chartEle = init("chart", {
       locale: "zh-CN",
     });
-
     chartEle!.setLoadMoreDataCallback(({ type, callback }) => {
       const firstData = chartEle?.getDataList()[0] as CandleData;
-      console.log(type);
-
       fetch(
         OKX_DOMAIN +
           `/api/v5/market/history-candles?after=${firstData?.timestamp}&instId=${selectPairRef.current}`
       ).then(async (res) => {
         const data = await res.json();
         const candles = formatCandleData(data.data);
-        console.log(candles);
-
         if (type === "forward") {
           callback(candles);
         }
-        // const newData = [...candles.reverse(), ...listData.current];
-        // chartEle?.applyNewData(newData);
       });
       // 获取更多k线数据
     });
@@ -198,31 +196,25 @@ export default function CurrencyAnalysis() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   // 编写一个设置价格精度函数
-  const setPricePrecision = (price?: string) => {
+  const setPricePrecision = (price?: number) => {
     if (selectedPair === "BTC-USDT-SWAP" || selectedPair === "BTC-USD-SWAP") {
-      chartEle!.setPrecision({ price: 1, volume: 6 });
+      chartEle!.setPrecision({ price: 1, volume: 2 });
     } else {
-      chartEle!.setPrecision({ price: calculatePrecision(price!), volume: 6 });
+      chartEle!.setPrecision({ price: getPrecision(price!), volume: 2 });
     }
   };
-  function calculatePrecision(price: string): number {
-    const decimalPart = price.toString().split(".")[1];
-    return decimalPart ? decimalPart.length : 0;
-  }
 
   const handleSelectProductChange = (value: Key | null) => {
     setSelectedPair(value as string);
     fetchData(value as string, selectedTimeFrame);
     selectPairRef.current = value as string;
     if (value === "BTC-USDT-SWAP" || value === "BTC-USD-SWAP") {
-      chartEle!.setPrecision({ price: 1, volume: 6 });
+      chartEle!.setPrecision({ price: 1, volume: 2 });
     } else {
       callback = () => {
-        console.log(listData.current[0].close);
-
         chartEle!.setPrecision({
-          price: calculatePrecision(listData.current[0].close! + ""),
-          volume: 6,
+          price: getPrecision(listData.current[0].close),
+          volume: 2,
         });
       };
     }
@@ -250,7 +242,7 @@ export default function CurrencyAnalysis() {
           </Autocomplete>
           {currentPrice && (
             <div className="text-2xl font-bold mt-2">
-              当前价格: ${currentPrice}
+              当前价格: ${toDecimalString(currentPrice)}
             </div>
           )}
         </div>
@@ -280,10 +272,10 @@ export default function CurrencyAnalysis() {
             height: 600,
           }}
         />
-        <div className="mt-6">
-          <h3 className="text-lg font-semibold mb-2">当前趋势分析</h3>
+        <div className="mt-6 flex">
+          <h2 className="text-xl font-semibold mb-2">当前趋势分析: </h2>
           <p
-            className={`text-xl font-bold ${
+            className={`text-lg ml-2 font-bold ${
               trend === "bullish"
                 ? "text-green-600"
                 : trend === "bearish"
